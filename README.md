@@ -1,4 +1,3 @@
-
 # 🥑 Avocado Ripeness Classifier API
 
 API ini digunakan untuk mendeteksi **tingkat kematangan buah alpukat** dari gambar menggunakan model Machine Learning.  
