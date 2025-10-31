@@ -1,101 +1,214 @@
-import React, { useState } from "react";
-import UploadCard from "./components/UploadCard";
-import ResultCard from "./components/ResultCard";
+import React, { useState, useRef } from "react";
 import { PredictionResult } from "./types";
 import { AvocadoIcon, ArrowPathIcon } from "./components/Icons";
 
-const API_URL = "https://Dawgggggg-AvocadoRipness.hf.space/predict"; // Ganti kalau backend beda port
+// === Komponen CameraCapture ===
+interface CameraCaptureProps {
+  onCapture: (file: File) => void;
+  isLoading?: boolean;
+}
+
+const CameraCapture: React.FC<CameraCaptureProps> = ({ onCapture, isLoading }) => {
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const [stream, setStream] = useState<MediaStream | null>(null);
+
+  const startCamera = async () => {
+    try {
+      const mediaStream = await navigator.mediaDevices.getUserMedia({ video: true });
+      setStream(mediaStream);
+      if (videoRef.current) {
+        videoRef.current.srcObject = mediaStream;
+      }
+    } catch (err) {
+      console.error("Error accessing camera:", err);
+      alert("Cannot access camera. Please allow permission.");
+    }
+  };
+
+  const capturePhoto = () => {
+    if (!videoRef.current) return;
+    const canvas = document.createElement("canvas");
+    canvas.width = videoRef.current.videoWidth;
+    canvas.height = videoRef.current.videoHeight;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+    ctx.drawImage(videoRef.current, 0, 0, canvas.width, canvas.height);
+    canvas.toBlob((blob) => {
+      if (blob) {
+        const file = new File([blob], "capture.png", { type: "image/png" });
+        onCapture(file);
+      }
+    }, "image/png");
+  };
+
+  return (
+    <div className="flex flex-col items-center space-y-4">
+      {!stream ? (
+        <button
+          onClick={startCamera}
+          className="px-4 py-2 bg-lime-600 text-white rounded-lg"
+        >
+          Start Camera
+        </button>
+      ) : (
+        <>
+          <video
+            ref={videoRef}
+            autoPlay
+            playsInline
+            className="w-full max-w-sm rounded-md shadow-md"
+          />
+          <button
+            onClick={capturePhoto}
+            disabled={isLoading}
+            className="px-4 py-2 bg-lime-500 text-white rounded-lg disabled:opacity-50"
+          >
+            Capture & Predict
+          </button>
+        </>
+      )}
+    </div>
+  );
+};
+
+// === Komponen UploadCard ===
+interface UploadCardProps {
+  onPredict: (file: File) => void;
+  onReset: () => void;
+  isLoading?: boolean;
+  hasResult?: boolean;
+}
+
+const UploadCard: React.FC<UploadCardProps> = ({ onPredict, onReset, isLoading, hasResult }) => {
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+      onPredict(e.target.files[0]);
+    }
+  };
+
+  return (
+    <div className="flex flex-col items-center space-y-4">
+      <input
+        type="file"
+        accept="image/*"
+        ref={fileInputRef}
+        onChange={handleFileChange}
+        className="hidden"
+      />
+      <button
+        onClick={() => fileInputRef.current?.click()}
+        disabled={isLoading}
+        className="px-4 py-2 bg-lime-500 text-white rounded-lg disabled:opacity-50"
+      >
+        Upload Image
+      </button>
+      {hasResult && (
+        <button
+          onClick={onReset}
+          className="px-4 py-2 bg-gray-300 text-gray-800 rounded-lg"
+        >
+          Reset
+        </button>
+      )}
+    </div>
+  );
+};
+
+// === Komponen ResultCard ===
+interface ResultCardProps {
+  label: string;
+  confidence: number;
+}
+
+const ResultCard: React.FC<ResultCardProps> = ({ label, confidence }) => (
+  <div className="p-6 bg-white rounded-lg shadow-md text-center">
+    <h2 className="text-xl font-bold mb-2">{label}</h2>
+    <p className="text-gray-700">Confidence: {(confidence * 100).toFixed(2)}%</p>
+  </div>
+);
+
+// === Main App ===
+const API_URL = "https://Dawgggggg-AvocadoRipness.hf.space/predict"; // Ganti sesuai backend
 
 const App: React.FC = () => {
   const [result, setResult] = useState<PredictionResult | null>(null);
-  const [isLoading, setIsLoading] = useState<boolean>(false);
+  const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // === Fungsi Prediksi ===
   const handlePredict = async (file: File) => {
-  if (!file) return;
+    if (!file) return;
 
-  // Validasi ukuran & tipe
-  if (!file.type.startsWith("image/")) {
-    setError("Please upload an image file (jpg, png, etc).");
-    return;
-  }
-  if (file.size > 5 * 1024 * 1024) {
-    setError("File too large! Maximum size is 5MB.");
-    return;
-  }
-
-  setIsLoading(true);
-  setResult(null);
-  setError(null);
-
-  try {
-    const formData = new FormData();
-    formData.append("file", file);
-
-    console.log("📤 Sending file:", file.name);
-
-    const maxRetries = 5;
-    const retryDelay = 5000; // 5 detik per retry
-
-    let attempt = 0;
-    let success = false;
-    let data: any = null;
-
-    while (!success && attempt < maxRetries) {
-      attempt++;
-      console.log(`⏳ Attempt ${attempt}...`);
-
-      try {
-        const controller = new AbortController();
-        const timeout = setTimeout(() => controller.abort(), 30000); // timeout 30 detik
-
-        const response = await fetch(API_URL, {
-          method: "POST",
-          body: formData,
-          signal: controller.signal,
-        });
-
-        clearTimeout(timeout);
-
-        if (!response.ok) {
-          const text = await response.text();
-          console.error("❌ Response error:", text);
-          throw new Error(`Server error: ${response.status}`);
-        }
-
-        data = await response.json();
-        success = true;
-      } catch (err: any) {
-        console.warn(`⚠️ Attempt ${attempt} failed:`, err.message);
-        if (attempt < maxRetries) {
-          console.log(`⏱ Waiting ${retryDelay / 1000}s before retry...`);
-          await new Promise((res) => setTimeout(res, retryDelay));
-        } else {
-          throw err;
-        }
-      }
+    if (!file.type.startsWith("image/")) {
+      setError("Please upload an image file (jpg, png, etc).");
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      setError("File too large! Maximum size is 5MB.");
+      return;
     }
 
-    console.log("✅ Parsed response:", data);
+    setIsLoading(true);
+    setResult(null);
+    setError(null);
 
-    if (data.error) throw new Error(data.error);
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
 
-    setResult({
-      label: data.label,
-      confidence: data.confidence,
-    });
-  } catch (err: any) {
-    console.error("🚨 Error calling Hugging Face API:", err);
-    setError(
-      "Failed to analyze avocado. The model might still be starting up. Try again in a few seconds."
-    );
-  } finally {
-    setIsLoading(false);
-  }
-};
+      const maxRetries = 5;
+      const retryDelay = 5000; // 5 detik
+      let attempt = 0;
+      let success = false;
+      let data: any = null;
 
-  // === Fungsi Reset ===
+      while (!success && attempt < maxRetries) {
+        attempt++;
+        try {
+          const controller = new AbortController();
+          const timeout = setTimeout(() => controller.abort(), 30000);
+
+          const response = await fetch(API_URL, {
+            method: "POST",
+            body: formData,
+            signal: controller.signal,
+          });
+          clearTimeout(timeout);
+
+          if (!response.ok) {
+            const text = await response.text();
+            throw new Error(`Server error: ${response.status} - ${text}`);
+          }
+
+          data = await response.json();
+          success = true;
+        } catch (err: any) {
+          console.warn(`Attempt ${attempt} failed:`, err.message);
+          if (attempt < maxRetries) {
+            await new Promise((res) => setTimeout(res, retryDelay));
+          } else {
+            throw err;
+          }
+        }
+      }
+
+      if (data.error) throw new Error(data.error);
+
+      setResult({
+        label: data.label,
+        confidence: data.confidence,
+      });
+    } catch (err: any) {
+      console.error("Error:", err);
+      setError(
+        "Failed to analyze avocado. The model might still be starting up. Try again in a few seconds."
+      );
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   const handleReset = () => {
     setResult(null);
     setError(null);
@@ -128,7 +241,7 @@ const App: React.FC = () => {
               Avocado Ripeness Recognition
             </h1>
             <p className="mt-2 text-lime-700">
-              Upload an image to check if your avocado is ready to eat!
+              Upload an image or capture from your camera to check if your avocado is ready to eat!
             </p>
           </header>
 
@@ -158,13 +271,16 @@ const App: React.FC = () => {
             </div>
           )}
 
-          {/* Upload Card */}
-          <UploadCard
-            onPredict={handlePredict}
-            onReset={handleReset}
-            isLoading={isLoading}
-            hasResult={!!result}
-          />
+          {/* Upload & Camera */}
+          <div className="flex flex-col items-center space-y-6">
+            <UploadCard
+              onPredict={handlePredict}
+              onReset={handleReset}
+              isLoading={isLoading}
+              hasResult={!!result}
+            />
+            <CameraCapture onCapture={handlePredict} isLoading={isLoading} />
+          </div>
 
           {/* Result Card */}
           {result && !error && (
