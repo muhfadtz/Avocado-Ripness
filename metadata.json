@@ -1,0 +1,5 @@
+{
+  "name": "Avocado Ripeness Recognition",
+  "description": "An application to recognize the ripeness of an avocado by uploading an image. This frontend is designed to be ready for integration with a backend service.",
+  "requestFramePermissions": []
+}
