@@ -79,9 +79,9 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onCapture, isLoading }) =
       <button
         onClick={capturePhoto}
         disabled={isLoading || !stream}
-        className="px-4 py-2 bg-lime-500 text-white rounded-lg disabled:opacity-50"
+        className="px-4 py-2 bg-lime-600 max-w-sm w-full text-white rounded-lg disabled:opacity-50"
       >
-        Capture Photo
+        Predict Ripeness
       </button>
 
       {/* Captured Preview */}
