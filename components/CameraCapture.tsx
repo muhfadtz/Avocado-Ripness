@@ -7,99 +7,95 @@ interface CameraCaptureProps {
 
 const CameraCapture: React.FC<CameraCaptureProps> = ({ onCapture, isLoading }) => {
   const videoRef = useRef<HTMLVideoElement>(null);
-  const [stream, setStream] = useState<MediaStream | null>(null);
   const [capturedPreview, setCapturedPreview] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [isReady, setIsReady] = useState(false);
 
   useEffect(() => {
     const startCamera = async () => {
       try {
-        // Pastikan site menggunakan HTTPS, kalau tidak camera akan ditolak browser
         if (window.location.protocol !== "https:") {
-          setError("Camera requires HTTPS to work in production.");
+          setError("Camera only works over HTTPS (or localhost).");
           return;
         }
 
         const mediaStream = await navigator.mediaDevices.getUserMedia({
-          video: { facingMode: "environment" }, // gunakan kamera belakang di HP
+          video: { facingMode: "environment" },
           audio: false,
         });
 
-        setStream(mediaStream);
-
         if (videoRef.current) {
           videoRef.current.srcObject = mediaStream;
+          // Kadang perlu user interaction di mobile Safari
           await videoRef.current.play().catch(() => {});
+          setIsReady(true);
         }
       } catch (err) {
-        console.error("Cannot access camera:", err);
-        setError("Cannot access camera. Please allow camera permission or refresh the page.");
+        console.error("Camera error:", err);
+        setError("Cannot access camera. Please allow permission.");
       }
     };
 
     startCamera();
 
     return () => {
-      // Stop semua track kamera saat komponen di-unmount
-      if (stream) {
-        stream.getTracks().forEach((track) => track.stop());
+      // Stop semua track kamera saat keluar
+      if (videoRef.current?.srcObject) {
+        const tracks = (videoRef.current.srcObject as MediaStream).getTracks();
+        tracks.forEach((t) => t.stop());
       }
     };
-  }, [stream]);
+  }, []); // <--- hanya dijalankan sekali
 
   const capturePhoto = () => {
-    if (!videoRef.current) return;
+    const video = videoRef.current;
+    if (!video) return;
+
     const canvas = document.createElement("canvas");
-    canvas.width = videoRef.current.videoWidth;
-    canvas.height = videoRef.current.videoHeight;
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
 
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
 
-    ctx.drawImage(videoRef.current, 0, 0, canvas.width, canvas.height);
+    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
     canvas.toBlob((blob) => {
-      if (blob) {
-        const file = new File([blob], "capture.png", { type: "image/png" });
-        const previewURL = URL.createObjectURL(blob);
-        setCapturedPreview(previewURL);
-        onCapture(file, previewURL);
-      }
+      if (!blob) return;
+      const file = new File([blob], "capture.png", { type: "image/png" });
+      const previewURL = URL.createObjectURL(blob);
+      setCapturedPreview(previewURL);
+      onCapture(file, previewURL);
     }, "image/png");
   };
 
   return (
     <div className="flex flex-col items-center space-y-4">
-      {/* Video Preview */}
       <div className="w-full max-w-sm border border-gray-300 rounded-md overflow-hidden shadow-md">
         {error ? (
           <div className="flex items-center justify-center h-64 bg-red-100 text-red-600 text-center p-4">
             {error}
           </div>
-        ) : stream ? (
+        ) : (
           <video
             ref={videoRef}
             className="w-full h-64 object-cover"
             autoPlay
             playsInline
             muted
+            onLoadedMetadata={() => videoRef.current?.play().catch(() => {})}
           />
-        ) : (
-          <div className="flex items-center justify-center h-64 bg-gray-200 text-gray-600">
-            Waiting for camera...
-          </div>
         )}
       </div>
 
-      {/* Capture Button */}
       <button
         onClick={capturePhoto}
-        disabled={isLoading || !stream}
+        disabled={isLoading || !isReady}
         className="w-full max-w-sm px-4 py-2 bg-lime-600 hover:bg-lime-700 text-white rounded-lg disabled:opacity-50 transition-all"
       >
         Predict Ripeness
       </button>
 
-      {/* Captured Preview */}
       {capturedPreview && (
         <div className="mt-4 w-full max-w-sm">
           <p className="text-gray-700 mb-1 text-sm">Captured Preview:</p>
