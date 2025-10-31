@@ -4,7 +4,7 @@ import ResultCard from "./components/ResultCard";
 import { PredictionResult } from "./types";
 import { AvocadoIcon, ArrowPathIcon } from "./components/Icons";
 
-const API_URL = "https://backend-avocado-production.up.railway.app/predict"; // Ganti kalau backend beda port
+const API_URL = "https://Dawgggggg-AvocadoRipness.hf.space/predict"; // Ganti kalau backend beda port
 
 const App: React.FC = () => {
   const [result, setResult] = useState<PredictionResult | null>(null);
@@ -13,61 +13,87 @@ const App: React.FC = () => {
 
   // === Fungsi Prediksi ===
   const handlePredict = async (file: File) => {
-    if (!file) return;
+  if (!file) return;
 
-    // Validasi ukuran & tipe
-    if (!file.type.startsWith("image/")) {
-      setError("Please upload an image file (jpg, png, etc).");
-      return;
-    }
-    if (file.size > 5 * 1024 * 1024) {
-      setError("File too large! Maximum size is 5MB.");
-      return;
-    }
+  // Validasi ukuran & tipe
+  if (!file.type.startsWith("image/")) {
+    setError("Please upload an image file (jpg, png, etc).");
+    return;
+  }
+  if (file.size > 5 * 1024 * 1024) {
+    setError("File too large! Maximum size is 5MB.");
+    return;
+  }
 
-    setIsLoading(true);
-    setResult(null);
-    setError(null);
+  setIsLoading(true);
+  setResult(null);
+  setError(null);
 
-    try {
-      const formData = new FormData();
-      formData.append("file", file); // Flask expects 'file'
+  try {
+    const formData = new FormData();
+    formData.append("file", file);
 
-      console.log("📤 Sending file:", file.name, file.type, file.size);
+    console.log("📤 Sending file:", file.name);
 
-      const response = await fetch(API_URL, {
-        method: "POST",
-        body: formData,
-      });
+    const maxRetries = 5;
+    const retryDelay = 5000; // 5 detik per retry
 
-      console.log("📥 Response status:", response.status);
+    let attempt = 0;
+    let success = false;
+    let data: any = null;
 
-      if (!response.ok) {
-        const text = await response.text();
-        console.error("❌ Flask Response:", text);
-        throw new Error(`Server error: ${response.status}`);
+    while (!success && attempt < maxRetries) {
+      attempt++;
+      console.log(`⏳ Attempt ${attempt}...`);
+
+      try {
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 30000); // timeout 30 detik
+
+        const response = await fetch(API_URL, {
+          method: "POST",
+          body: formData,
+          signal: controller.signal,
+        });
+
+        clearTimeout(timeout);
+
+        if (!response.ok) {
+          const text = await response.text();
+          console.error("❌ Response error:", text);
+          throw new Error(`Server error: ${response.status}`);
+        }
+
+        data = await response.json();
+        success = true;
+      } catch (err: any) {
+        console.warn(`⚠️ Attempt ${attempt} failed:`, err.message);
+        if (attempt < maxRetries) {
+          console.log(`⏱ Waiting ${retryDelay / 1000}s before retry...`);
+          await new Promise((res) => setTimeout(res, retryDelay));
+        } else {
+          throw err;
+        }
       }
-
-      const data = await response.json();
-      console.log("✅ Parsed response:", data);
-
-      if (data.error) {
-        throw new Error(data.error);
-      }
-
-      setResult({
-        label: data.label,
-        confidence: data.confidence,
-      });
-    } catch (err: any) {
-      console.error("🚨 Error calling Flask API:", err);
-      setError(
-        "Failed to analyze avocado. Please check your image or try again later."
-      );
-    } finally {
-      setIsLoading(false);
     }
-  };
+
+    console.log("✅ Parsed response:", data);
+
+    if (data.error) throw new Error(data.error);
+
+    setResult({
+      label: data.label,
+      confidence: data.confidence,
+    });
+  } catch (err: any) {
+    console.error("🚨 Error calling Hugging Face API:", err);
+    setError(
+      "Failed to analyze avocado. The model might still be starting up. Try again in a few seconds."
+    );
+  } finally {
+    setIsLoading(false);
+  }
+};
 
   // === Fungsi Reset ===
   const handleReset = () => {
