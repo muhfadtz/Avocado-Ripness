@@ -4,7 +4,7 @@ import ResultCard from "./components/ResultCard";
 import { PredictionResult } from "./types";
 import { AvocadoIcon, ArrowPathIcon } from "./components/Icons";
 
-const API_URL = "http://localhost:5000/predict"; // Ganti kalau backend beda port
+const API_URL = "backend-avocado-production.up.railway.app/predict"; // Ganti kalau backend beda port
 
 const App: React.FC = () => {
   const [result, setResult] = useState<PredictionResult | null>(null);

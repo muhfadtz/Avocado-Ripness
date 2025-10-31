@@ -1,20 +1,151 @@
-<div align="center">
-<img width="1200" height="475" alt="GHBanner" src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" />
-</div>
+```markdown
+# 🥑 Avocado Ripeness Classifier API
 
-# Run and deploy your AI Studio app
+API ini digunakan untuk mendeteksi **tingkat kematangan buah alpukat** dari gambar menggunakan model Machine Learning.  
+Dibangun dengan **Flask** dan mendukung **CORS** agar mudah diintegrasikan dengan aplikasi web atau mobile.  
 
-This contains everything you need to run your app locally.
+---
 
-View your app in AI Studio: https://ai.studio/apps/drive/1j8wuWL33HQteI1hUf6_IUpujZ1DRI7gT
+## 🚀 Fitur Utama
 
-## Run Locally
+✅ Prediksi kematangan alpukat (Belum Matang / Matang) dari gambar  
+✅ Preprocessing otomatis (resize, normalisasi, ekstraksi fitur)  
+✅ Dukungan feature extractor eksternal (mis. PCA/Scaler)  
+✅ Respons cepat berbentuk JSON  
+✅ Siap digunakan di backend production  
 
-**Prerequisites:**  Node.js
+---
 
+## 🧱 Struktur Folder
 
-1. Install dependencies:
-   `npm install`
-2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
-3. Run the app:
-   `npm run dev`
+```
+
+project/
+├── app.py                    # Main Flask API
+├── model/
+│   ├── model_alpukat.pkl     # Model klasifikasi utama
+│   └── feature_extractor.pkl # (Opsional) Scaler/PCA untuk preprocessing
+├── requirements.txt          # Daftar dependensi Python
+└── README.md                 # Dokumentasi proyek
+
+````
+
+---
+
+## ⚙️ Instalasi
+
+### 1️⃣ Clone Repository
+```bash
+git clone https://github.com/username/avocado-ripeness-api.git
+cd avocado-ripeness-api
+````
+
+### 2️⃣ Buat Virtual Environment
+
+```bash
+python -m venv venv
+source venv/bin/activate      # (Linux/Mac)
+venv\Scripts\activate         # (Windows)
+```
+
+### 3️⃣ Install Dependencies
+
+```bash
+pip install -r requirements.txt
+```
+
+---
+
+## 📦 Jalankan Aplikasi
+
+### 1️⃣ Pastikan Model Sudah Ada
+
+Letakkan file berikut di folder `model/`:
+
+* `model_alpukat.pkl`
+* `feature_extractor.pkl` *(opsional)*
+
+### 2️⃣ Jalankan Flask
+
+```bash
+python app.py
+```
+
+Aplikasi akan berjalan di:
+👉 **[http://localhost:5000](http://localhost:5000)**
+
+---
+
+## 🌐 Endpoint
+
+### 🔹 `GET /`
+
+Cek status API.
+**Response:**
+
+```json
+{
+  "message": "🍈 Avocado Ripeness Recognition API is running!",
+  "status": "OK"
+}
+```
+
+---
+
+### 🔹 `POST /predict`
+
+Prediksi kematangan alpukat dari file gambar.
+
+**Form Data:**
+
+| Key  | Type                  | Deskripsi                           |
+| ---- | --------------------- | ----------------------------------- |
+| file | File (image/jpeg/png) | Gambar alpukat yang akan diprediksi |
+
+**Response:**
+
+```json
+{
+  "label": "Matang",
+  "confidence": 0.9735
+}
+```
+
+**Error Response (contoh):**
+
+```json
+{
+  "error": "Dimensi fitur tidak cocok",
+  "expected": 150528,
+  "received": 100000
+}
+```
+
+---
+
+## 🧠 Cara Kerja Singkat
+
+1. Gambar diunggah ke endpoint `/predict`
+2. Sistem melakukan:
+
+   * Konversi ke RGB
+   * Resize ke 224×224
+   * Normalisasi & Flatten
+   * (Opsional) Transformasi lewat feature extractor
+3. Model ML memprediksi label
+4. API mengembalikan hasil prediksi + confidence
+
+---
+
+## 🧰 Dependencies
+
+```
+Flask
+Flask-Cors
+numpy
+Pillow
+joblib
+scikit-learn
+```
+
+---
